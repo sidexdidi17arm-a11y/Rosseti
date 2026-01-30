@@ -391,7 +391,7 @@
               ${score}%<br><small>${Number(r.correctAnswers||0)}/${Number(r.totalQuestions||0)}</small>
             </td>
             <td>${escapeHtml(r.testDuration||'')}</td>
-            <td><span style="padding:6px 10px;border-radius:999px;background:#e7f7ef;color:#27ae60;font-weight:900;font-size:.9rem">${escapeHtml(r.status||'')}</span></td>
+            <td><span style="padding:6px 10px;border-radius:999px;background:#e7f7ef;color:#27ae60;font-weight:900;font-size:.9rem">${escapeHtml(r.status||'')}</span>${(r.testMode==='training') ? '<div style="margin-top:6px;display:inline-block;padding:4px 10px;border-radius:999px;background:#e8f1ff;color:#2d5cc2;font-weight:900;font-size:.75rem">ТРЕНИРОВОЧНЫЙ РЕЖИМ</div>' : ''}</td>
             <td>
               <div class="actions">
                 <button class="btn btn-primary small" data-act="view" data-id="${escapeAttr(r.id)}"><i class="fas fa-eye"></i></button>
