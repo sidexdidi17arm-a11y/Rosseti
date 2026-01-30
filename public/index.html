@@ -3298,7 +3298,8 @@
         // Инициализация пользовательских паролей
         let userPasswords = {
             admin: DEFAULT_ADMIN_PASSWORD,
-            start: DEFAULT_START_PASSWORD
+            start: DEFAULT_START_PASSWORD,
+            training: "test123" // пароль для тренировочного режима
         };
         
         // DOM элементы
@@ -4479,7 +4480,12 @@ proceedToTest() {
                     return;
                 }
                 
-                if (startPassword !== userPasswords.start && startPassword !== userPasswords.admin) {
+                // Проверка пароля запуска: для тренировочного режима используется отдельный пароль
+                const allowedPasswords = (testState.testMode === 'training')
+                    ? [userPasswords.training, userPasswords.admin]
+                    : [userPasswords.start, userPasswords.admin];
+
+                if (!allowedPasswords.includes(startPassword)) {
                     alert('Неверный пароль для запуска теста');
                     elements.startPasswordInput.value = '';
                     return;
@@ -6106,6 +6112,7 @@ proceedToTest() {
                         totalQuestions: testState.totalQuestions,
                         testDuration: duration,
                         status: 'Завершен',
+                        testMode: testState.testMode, // 'exam' | 'training'
                         details: {
                             answers: testState.answers || {},
                             answersDetailed: detailedAnswers,
