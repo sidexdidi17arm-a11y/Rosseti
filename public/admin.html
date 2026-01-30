@@ -216,7 +216,6 @@
     const v = $('admin-pass').value || '';
     if (v === ADMIN_PASSWORD) {
       sessionStorage.setItem('adminAuth', '1');
-      sessionStorage.setItem('adminPass', v);
       authError.style.display = 'none';
       showApp();
       Admin.init();
@@ -254,25 +253,15 @@
       $('report-overlay').addEventListener('click', (e) => { if (e.target === $('report-overlay')) $('report-overlay').style.display = 'none'; });
     },
     load() {
-      // 1) Пытаемся загрузить с сервера (доступно после авторизации)
-      const pass = sessionStorage.getItem('adminPass') || '';
-      const fromServer = () => fetch('/api/results', { headers: { 'X-Admin-Password': pass } })
-        .then(r => r.ok ? r.json() : Promise.reject(r))
-        .then(arr => { this.reports = Array.isArray(arr) ? arr : []; return true; })
-        .catch(() => false);
+      try {
+        const saved = localStorage.getItem('testResults');
+        const arr = saved ? JSON.parse(saved) : [];
+        this.reports = Array.isArray(arr) ? arr : [];
+      } catch {
+        this.reports = [];
+      }
 
-      const fromLocal = () => {
-        try {
-          const saved = localStorage.getItem('testResults');
-          const arr = saved ? JSON.parse(saved) : [];
-          this.reports = Array.isArray(arr) ? arr : [];
-        } catch {
-          this.reports = [];
-        }
-      };
-
-      return fromServer().then(ok => { if (!ok) fromLocal();
-// сортировка: новые сверху
+      // сортировка: новые сверху
       this.reports.sort((a,b) => new Date((b.testDate||'')+' '+(b.testTime||'00:00')) - new Date((a.testDate||'')+' '+(a.testTime||'00:00')));
       this.filtered = [...this.reports];
       this.updateFilterOptions();
@@ -717,11 +706,6 @@ exportAll() {
       if (!confirm('Удалить этот отчёт?')) return;
       this.reports = this.reports.filter(r => String(r.id) !== String(id));
       this.save();
-      // удаляем на сервере
-      try {
-        const pass = sessionStorage.getItem('adminPass') || '';
-        fetch('/api/results/' + encodeURIComponent(id), { method: 'DELETE', headers: { 'X-Admin-Password': pass } }).catch(()=>{});
-      } catch(e) {}
       this.filtered = [...this.reports];
       this.updateFilterOptions();
       this.renderAll();
@@ -731,11 +715,6 @@ exportAll() {
       if (!confirm('Удалить ВСЕ отчёты? Это действие нельзя отменить.')) return;
       this.reports = [];
       this.save();
-      // удаляем на сервере
-      try {
-        const pass = sessionStorage.getItem('adminPass') || '';
-        fetch('/api/results', { method: 'DELETE', headers: { 'X-Admin-Password': pass } }).catch(()=>{});
-      } catch(e) {}
       this.filtered = [];
       this.updateFilterOptions();
       this.renderAll();
