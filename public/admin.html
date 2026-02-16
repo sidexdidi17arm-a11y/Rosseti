@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ПАО «РОССЕТИ ЮГ» — Админ-панель</title>
+
+  <link rel="stylesheet" href="assets_unified/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Layout fixes: prevent filter controls from overlapping */
+    *, *::before, *::after{box-sizing:border-box}
+
+    .container{max-width:1400px;margin:0 auto;padding:20px}
+    header{background:linear-gradient(135deg,#1a3a8f 0%,#2d5cc2 100%);color:#fff;padding:25px 0;text-align:center;border-radius:0 0 15px 15px;box-shadow:0 6px 20px rgba(0,0,0,.15);margin-bottom:30px;position:relative}
+    header h1{margin:0 0 10px 0;font-size:2.2rem;font-weight:800}
+    header p{margin:0;opacity:.95}
+
+    .top-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+    .pill{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:12px 20px;border-radius:999px;display:flex;gap:10px;align-items:center;text-decoration:none;font-weight:800;cursor:pointer}
+    .pill:hover{background:rgba(255,255,255,.25)}
+
+    .card{background:#fff;border:1px solid #eef2ff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.12);overflow:hidden}
+    .card::before{content:'';display:block;height:5px;background:linear-gradient(90deg,#2d5cc2,#1a3a8f)}
+    .card-body{padding:26px}
+
+    .filters{background:#f8f9ff;border:2px solid #e6e9f0;border-radius:12px;padding:18px;margin-bottom:20px}
+    .filters h4{margin:0 0 12px 0;color:#1a3a8f}
+    .filters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+    .form-group{min-width:0}
+    .form-group label{display:flex;gap:8px;align-items:center;font-weight:700;margin-bottom:6px}
+    .form-group input,.form-group select{width:100%;padding:12px 14px;border:2px solid #e6e9f0;border-radius:10px;background:#fff;font-size:1rem}
+    .btn{padding:12px 18px;border:none;border-radius:10px;font-weight:800;cursor:pointer;display:inline-flex;gap:10px;align-items:center}
+    .btn-primary{background:linear-gradient(135deg,#2d5cc2,#1a3a8f);color:#fff}
+    .btn-danger{background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff}
+    .btn-excel{background:linear-gradient(135deg,#217346,#1b5e3c);color:#fff}
+    .btn-secondary{background:#eef2ff;color:#1a3a8f}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.12)}
+
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0 22px}
+    .stat{background:#fff;border:2px solid #eef2ff;border-radius:14px;padding:16px;text-align:center;box-shadow:0 5px 15px rgba(0,0,0,.08)}
+    .stat .v{font-size:2rem;font-weight:900}
+    .stat .l{color:#666}
+
+    .table-wrap{overflow:auto;border:2px solid #e6e9f0;border-radius:12px}
+    table{width:100%;border-collapse:collapse;min-width:1100px}
+    th{position:sticky;top:0;background:linear-gradient(135deg,#1a3a8f,#2d5cc2);color:#fff;padding:14px;text-align:left}
+    td{padding:12px 14px;border-bottom:1px solid #e6e9f0;vertical-align:top}
+    tr:nth-child(even){background:#f8f9fa}
+    tr:hover{background:#f8f9ff}
+
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .small{padding:8px 10px;border-radius:10px;font-size:.9rem}
+
+    /* Modal */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:999;align-items:center;justify-content:center}
+    .modal{background:#fff;width:92%;max-width:1000px;max-height:84vh;overflow:auto;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.3);position:relative}
+    .modal-head{padding:18px 22px;border-bottom:2px solid #eef2ff;display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .modal-head h2{margin:0;color:#1a3a8f;font-size:1.3rem}
+    .modal-body{padding:18px 22px}
+    .close{background:none;border:none;font-size:28px;cursor:pointer;color:#666}
+
+    .qa{border:2px solid #eef2ff;border-radius:14px;padding:14px;margin:12px 0;background:#fff}
+    .qa .qtitle{font-weight:900;margin:0 0 8px 0}
+    .qa .meta{color:#666;font-size:.95rem;margin-bottom:10px}
+    .opt{padding:10px 12px;border:1px solid #e6e9f0;border-radius:10px;margin:8px 0}
+    .opt.correct{border-color:#27ae60;background:#e7f7ef}
+    .opt.selected{outline:3px solid rgba(45,92,194,.18)}
+    .opt.wrong{border-color:#e74c3c;background:#fdecea}
+
+    /* Auth */
+    .auth-card{background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.35);width:92%;max-width:520px;padding:26px;border:1px solid #eef2ff;position:relative}
+    .auth-card h2{margin:0 0 10px 0;color:#1a3a8f}
+    .auth-card p{margin:0 0 16px 0;color:#666}
+    .auth-card input{width:100%;padding:14px 14px;border:2px solid #e6e9f0;border-radius:12px;font-size:1rem}
+    .auth-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .auth-error{color:#c0392b;font-weight:800;margin-top:10px;display:none}
+
+    
+
+    @media(max-width:640px){
+      .filters-grid{grid-template-columns:1fr}
+    }
+
+    @media(max-width:768px){
+      header h1{font-size:1.8rem}
+      .card-body{padding:18px}
+      table{min-width:980px}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1><i class="fas fa-bolt"></i> ПАО «РОССЕТИ ЮГ» — Админ-панель</h1>
+    <p>Отчёты по прохождению тестов</p>
+
+    <div class="top-actions">
+      <button class="pill" id="go-main"><i class="fas fa-home"></i> На главную</button>
+      <button class="pill" id="logout"><i class="fas fa-right-from-bracket"></i> Выйти</button>
+    </div>
+  </div>
+</header>
+
+<div class="container" id="app" style="display:none;">
+  <div class="card">
+    <div class="card-body">
+
+      <div class="filters">
+        <h4><i class="fas fa-filter"></i> Фильтры</h4>
+        <div class="filters-grid">
+          <div class="form-group">
+            <label><i class="fas fa-calendar-alt"></i> Дата с</label>
+            <input type="date" id="date-from">
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-calendar-alt"></i> Дата по</label>
+            <input type="date" id="date-to">
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-building"></i> Подразделение</label>
+            <select id="department-filter"><option value="">Все</option></select>
+          </div>
+          <div class="form-group">
+            <label><i class="fas fa-user-tie"></i> Должность</label>
+            <select id="position-filter"><option value="">Все</option></select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn btn-primary" id="apply"><i class="fas fa-search"></i> Применить</button>
+          <button class="btn btn-secondary" id="reset"><i class="fas fa-rotate-left"></i> Сбросить</button>
+          <button class="btn btn-excel" id="export-all"><i class="fas fa-file-excel"></i> Экспорт всех</button>
+          <button class="btn btn-danger" id="delete-all"><i class="fas fa-trash"></i> Удалить все</button>
+        </div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>ФИО</th>
+              <th>Должность</th>
+              <th>Подразделение</th>
+              <th>Тест</th>
+              <th>Дата</th>
+              <th>Результат</th>
+              <th>Время</th>
+              <th>Статус</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="empty" style="display:none;text-align:center;padding:44px 10px;color:#666">
+        <div style="font-size:54px;opacity:.25;margin-bottom:10px"><i class="fas fa-inbox"></i></div>
+        <h3 style="margin:0 0 6px 0">Нет данных</h3>
+        <p style="margin:0">Сначала пройдите тест на главной странице — отчёты появятся здесь.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div class="overlay" id="report-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modal-title"><i class="fas fa-file-alt"></i> Детали отчёта</h2>
+      <button class="close" id="close-modal">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Auth Overlay -->
+<div class="overlay" id="auth-overlay" style="display:flex;">
+  <div class="auth-card">
+    <h2><i class="fas fa-lock"></i> Вход в админ-режим</h2>
+    <p>Введите пароль администратора.</p>
+    <input type="password" id="admin-pass" placeholder="Пароль" autocomplete="current-password">
+    <div class="auth-actions">
+      <button class="btn btn-primary" id="auth-login"><i class="fas fa-right-to-bracket"></i> Войти</button>
+      <button class="btn btn-secondary" id="auth-cancel"><i class="fas fa-home"></i> На главную</button>
+    </div>
+    <div class="auth-error" id="auth-error">Неверный пароль</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const ADMIN_PASSWORD = 'admin123';
+
+  const $ = (id) => document.getElementById(id);
+
+  const authOverlay = $('auth-overlay');
+  const app = $('app');
+  const authError = $('auth-error');
+
+  function isAuthed() {
+    return sessionStorage.getItem('adminAuth') === '1';
+  }
+
+  function showAuth() {
+    authOverlay.style.display = 'flex';
+    app.style.display = 'none';
+    $('admin-pass').value = '';
+    authError.style.display = 'none';
+    setTimeout(() => $('admin-pass').focus(), 50);
+  }
+
+  function showApp() {
+    authOverlay.style.display = 'none';
+    app.style.display = 'block';
+  }
+
+  function login() {
+    const v = $('admin-pass').value || '';
+    if (v === ADMIN_PASSWORD) {
+      sessionStorage.setItem('adminAuth', '1');
+      sessionStorage.setItem('adminPass', v);
+      authError.style.display = 'none';
+      showApp();
+      Admin.init();
+    } else {
+      authError.style.display = 'block';
+    }
+  }
+
+  $('auth-login').addEventListener('click', login);
+  $('admin-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  $('auth-cancel').addEventListener('click', () => { window.location.href = 'index.html'; });
+
+  $('go-main').addEventListener('click', () => { window.location.href = 'index.html'; });
+  $('logout').addEventListener('click', () => {
+    sessionStorage.removeItem('adminAuth');
+    showAuth();
+  });
+
+  // ===== Admin logic =====
+  const Admin = {
+    reports: [],
+    filtered: [],
+    init() {
+      this.load();
+      this.bind();
+      this.renderAll();
+    },
+    bind() {
+      $('apply').addEventListener('click', () => this.applyFilters());
+      $('reset').addEventListener('click', () => this.resetFilters());
+      $('export-all').addEventListener('click', () => this.exportAll());
+      $('delete-all').addEventListener('click', () => this.deleteAll());
+
+      $('close-modal').addEventListener('click', () => $('report-overlay').style.display = 'none');
+      $('report-overlay').addEventListener('click', (e) => { if (e.target === $('report-overlay')) $('report-overlay').style.display = 'none'; });
+    },
+    load() {
+      // 1) Пытаемся загрузить с сервера (доступно после авторизации)
+      const pass = sessionStorage.getItem('adminPass') || '';
+      const fromServer = () => fetch('/api/results', { headers: { 'X-Admin-Password': pass } })
+        .then(r => r.ok ? r.json() : Promise.reject(r))
+        .then(arr => { this.reports = Array.isArray(arr) ? arr : []; return true; })
+        .catch(() => false);
+
+      const fromLocal = () => {
+        try {
+          const saved = localStorage.getItem('testResults');
+          const arr = saved ? JSON.parse(saved) : [];
+          this.reports = Array.isArray(arr) ? arr : [];
+        } catch {
+          this.reports = [];
+        }
+      };
+      return fromServer().then(ok => {
+        if (!ok) fromLocal();
+
+        // сортировка: новые сверху
+        this.reports.sort(
+          (a, b) =>
+            new Date((b.testDate || '') + ' ' + (b.testTime || '00:00')) -
+            new Date((a.testDate || '') + ' ' + (a.testTime || '00:00'))
+        );
+
+        this.filtered = [...this.reports];
+        this.updateFilterOptions();
+
+        // Гарантируем отрисовку после асинхронной загрузки
+        this.renderAll();
+      });
+    },
+    save() {
+      localStorage.setItem('testResults', JSON.stringify(this.reports));
+    },
+    updateFilterOptions() {
+      const depts = [...new Set(this.reports.map(r => r.userDepartment).filter(Boolean))].sort();
+      const poss  = [...new Set(this.reports.map(r => r.userPosition).filter(Boolean))].sort();
+
+      const deptSel = $('department-filter');
+      deptSel.innerHTML = '<option value="">Все</option>' + depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+
+      const posSel = $('position-filter');
+      posSel.innerHTML = '<option value="">Все</option>' + poss.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+    },
+    applyFilters() {
+      const dateFrom = $('date-from').value;
+      const dateTo   = $('date-to').value;
+      const dept     = $('department-filter').value;
+      const pos      = $('position-filter').value;
+
+      let arr = [...this.reports];
+
+      if (dateFrom) arr = arr.filter(r => (r.testDate || '') >= dateFrom);
+      if (dateTo)   arr = arr.filter(r => (r.testDate || '') <= dateTo);
+      if (dept)     arr = arr.filter(r => r.userDepartment === dept);
+      if (pos)      arr = arr.filter(r => r.userPosition === pos);
+
+      this.filtered = arr;
+      this.renderTable();
+      this.renderStats();
+    },
+    resetFilters() {
+      $('date-from').value = '';
+      $('date-to').value = '';
+      $('department-filter').value = '';
+      $('position-filter').value = '';
+      this.filtered = [...this.reports];
+      this.renderAll();
+    },
+    renderAll() {
+      this.renderStats();
+      this.renderTable();
+    },
+    renderStats() {
+      const el = $('stats');
+      const arr = this.filtered;
+
+      if (!arr.length) { el.innerHTML=''; return; }
+
+      const total = arr.length;
+      const avg = arr.reduce((s,r)=>s+(Number(r.score)||0),0)/total;
+      const best = Math.max(...arr.map(r=>Number(r.score)||0));
+      const completed = arr.filter(r=>r.status==='Завершен').length;
+
+      // лучшее подразделение (по среднему)
+      const byDept = {};
+      arr.forEach(r=>{
+        const d=r.userDepartment||'';
+        if(!d) return;
+        if(!byDept[d]) byDept[d]={c:0,s:0};
+        byDept[d].c++; byDept[d].s += Number(r.score)||0;
+      });
+      let bestDept='—', bestDeptScore=-1;
+      Object.keys(byDept).forEach(d=>{
+        const v=byDept[d].s/byDept[d].c;
+        if(v>bestDeptScore){bestDeptScore=v;bestDept=d;}
+      });
+
+      el.innerHTML = `
+        <div class="stat"><div class="v" style="color:#2d5cc2">${total}</div><div class="l">Тестов</div></div>
+        <div class="stat"><div class="v" style="color:#27ae60">${avg.toFixed(1)}%</div><div class="l">Средний балл</div></div>
+        <div class="stat"><div class="v" style="color:#ff9800">${best}%</div><div class="l">Лучший результат</div></div>
+        <div class="stat"><div class="v" style="color:#17a2b8">${completed}</div><div class="l">Завершено</div></div>
+        <div class="stat"><div class="v" style="color:#e74c3c;font-size:1.2rem;line-height:1.2">${escapeHtml(bestDept)}</div><div class="l">Лучшее подразделение</div></div>
+      `;
+    },
+    renderTable() {
+      const tbody = $('tbody');
+      const empty = $('empty');
+
+      if (!this.filtered.length) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      tbody.innerHTML = this.filtered.map((r, idx) => {
+        const score = Number(r.score)||0;
+        let scoreColor='#27ae60';
+        if (score < 60) scoreColor='#e74c3c';
+        else if (score < 80) scoreColor='#f39c12';
+
+        return `
+          <tr>
+            <td>${idx+1}</td>
+            <td><strong>${escapeHtml(r.userName||'')}</strong></td>
+            <td>${escapeHtml(r.userPosition||'')}</td>
+            <td>${escapeHtml(r.userDepartment||'')}</td>
+            <td>${escapeHtml(r.testTitle||'')}</td>
+            <td>${escapeHtml(r.testDate||'')}<br><small>${escapeHtml(r.testTime||'')}</small></td>
+            <td style="color:${scoreColor};font-weight:900">
+              ${score}%<br><small>${Number(r.correctAnswers||0)}/${Number(r.totalQuestions||0)}</small>
+            </td>
+            <td>${escapeHtml(r.testDuration||'')}</td>
+            <td><span style="padding:6px 10px;border-radius:999px;background:#e7f7ef;color:#27ae60;font-weight:900;font-size:.9rem">${escapeHtml(r.status||'')}</span>${(r.testMode==='training') ? '<div style="margin-top:6px;display:inline-block;padding:4px 10px;border-radius:999px;background:#e8f1ff;color:#2d5cc2;font-weight:900;font-size:.75rem">ТРЕНИРОВОЧНЫЙ РЕЖИМ</div>' : ''}</td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-primary small" data-act="view" data-id="${escapeAttr(r.id)}"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-excel small" data-act="export" data-id="${escapeAttr(r.id)}"><i class="fas fa-file-excel"></i></button>
+                <button class="btn btn-danger small" data-act="del" data-id="${escapeAttr(r.id)}"><i class="fas fa-trash"></i></button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('button[data-act]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const act = btn.getAttribute('data-act');
+          if (act === 'view') this.openReport(id);
+          if (act === 'export') this.exportOne(id);
+          if (act === 'del') this.deleteOne(id);
+        });
+      });
+    },
+    getById(id) {
+      return this.reports.find(r => String(r.id) === String(id));
+    },
+    openReport(id) {
+      const r = this.getById(id);
+      if (!r) return;
+
+      const answers = (r.details && Array.isArray(r.details.answersDetailed)) ? r.details.answersDetailed : [];
+      const body = $('modal-body');
+
+      const summary = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px">
+          <div style="background:#f8f9ff;padding:14px;border-radius:12px;border-left:4px solid #2d5cc2">
+            <div style="color:#666;font-size:.9rem">ФИО</div>
+            <div style="font-weight:900">${escapeHtml(r.userName||'')}</div>
+          </div>
+          <div style="background:#f8f9ff;padding:14px;border-radius:12px;border-left:4px solid #27ae60">
+            <div style="color:#666;font-size:.9rem">Тест</div>
+            <div style="font-weight:900">${escapeHtml(r.testTitle||'')}</div>
+          </div>
+          <div style="background:#fff;padding:14px;border-radius:12px;border:2px solid #eef2ff;text-align:center">
+            <div style="font-size:1.8rem;font-weight:900;color:#2d5cc2">${Number(r.score||0)}%</div>
+            <div style="color:#666">Результат</div>
+          </div>
+          <div style="background:#fff;padding:14px;border-radius:12px;border:2px solid #eef2ff;text-align:center">
+            <div style="font-size:1.8rem;font-weight:900;color:#27ae60">${Number(r.correctAnswers||0)}/${Number(r.totalQuestions||0)}</div>
+            <div style="color:#666">Верно</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-excel" id="modal-export"><i class="fas fa-file-excel"></i> Excel</button>
+          <button class="btn btn-primary" id="modal-word"><i class="fas fa-file-word"></i> Word</button>
+          <button class="btn btn-danger" id="modal-delete"><i class="fas fa-trash"></i> Удалить</button>
+        </div>
+        <hr style="border:none;border-top:2px solid #eef2ff;margin:14px 0">
+        <h3 style="margin:0 0 10px 0;color:#1a3a8f"><i class="fas fa-list-check"></i> Ответы</h3>
+      `;
+
+      let answersHtml = '';
+      if (!answers.length) {
+        answersHtml = `
+          <div style="color:#666;background:#f8f9ff;border:2px solid #e6e9f0;border-radius:12px;padding:14px">
+            Для этого отчёта нет детальных ответов. Пройдите тест заново (в новой версии) — ответы будут сохраняться полностью.
+          </div>
+        `;
+      } else {
+        answersHtml = answers.map(a => {
+          const sel = (a.selectedAnswer || '').toString().toUpperCase();
+          const cor = (a.correctAnswer || '').toString().toUpperCase();
+          const isCorrect = !!a.isCorrect;
+
+          const opts = Array.isArray(a.options) ? a.options : [];
+          const optsHtml = opts.map(o => {
+            const letter = (o.letter || '').toString().toUpperCase();
+            const text = (o.text ?? '').toString();
+            const classes = [
+              'opt',
+              (letter === cor ? 'correct' : ''),
+              (letter === sel ? 'selected' : ''),
+              (letter === sel && sel && cor && sel !== cor ? 'wrong' : '')
+            ].filter(Boolean).join(' ');
+            return `<div class="${classes}">
+              <strong>${escapeHtml(letter)}.</strong> ${escapeHtml(text)}
+              ${letter === cor ? ' <span style="font-weight:900;color:#27ae60"> (правильный)</span>' : ''}
+              ${letter === sel ? (isCorrect ? ' <span style="font-weight:900;color:#2d5cc2"> (ваш ответ)</span>' : ' <span style="font-weight:900;color:#e74c3c"> (ваш ответ)</span>') : ''}
+            </div>`;
+          }).join('');
+
+          const expl = (a.explanation || '').toString().trim();
+          return `
+            <div class="qa">
+              <div class="qtitle">Вопрос ${Number(a.number)||''}: ${escapeHtml(a.text||'')}</div>
+              <div class="meta">Раздел: <strong>${escapeHtml(a.section||'')}</strong> • Ваш ответ: <strong>${escapeHtml(sel||'—')}</strong> • Правильный: <strong>${escapeHtml(cor||'—')}</strong> • ${isCorrect ? '<span style="color:#27ae60;font-weight:900">Верно</span>' : '<span style="color:#e74c3c;font-weight:900">Неверно</span>'}</div>
+              ${optsHtml}
+              ${expl ? `<div style="margin-top:10px;background:#f8f9ff;border:1px solid #e6e9f0;border-radius:12px;padding:12px"><strong>Пояснение:</strong> ${escapeHtml(expl)}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      body.innerHTML = summary + answersHtml;
+
+      $('report-overlay').style.display = 'flex';
+
+      $('modal-export').addEventListener('click', () => this.exportOne(id));
+      $('modal-word').addEventListener('click', () => this.exportWord(id));
+      $('modal-delete').addEventListener('click', () => {
+        if (confirm('Удалить этот отчёт?')) {
+          this.deleteOne(id);
+          $('report-overlay').style.display = 'none';
+        }
+      });
+    },
+    
+exportOne(id) {
+  const r = this.getById(id);
+  if (!r) return;
+
+  // Лёгкая, информативная сводка (без перегруза)
+  const summary = [[
+    'ФИО','Подразделение','Должность','Тест','Дата','Время','Балл (%)','Верно/Всего','Длительность','Статус'
+  ]];
+
+  summary.push([
+    r.userName,
+    r.userDepartment,
+    r.userPosition,
+    r.testTitle,
+    r.testDate,
+    r.testTime,
+    Number(r.score || 0),
+    `${Number(r.correctAnswers||0)}/${Number(r.totalQuestions||0)}`,
+    r.testDuration,
+    r.status
+  ]);
+
+  const answers = (r.details && Array.isArray(r.details.answersDetailed)) ? r.details.answersDetailed : [];
+
+  // Ответы (коротко): без пояснений и лишних длинных текстов
+  const answersSheet = [[ '№','Раздел','Вопрос (кратко)','Ответ','Правильный','Верно' ]];
+  const errorsSheet  = [[ '№','Раздел','Вопрос','Ваш ответ','Правильный','Пояснение' ]];
+
+  const shorten = (s, n=140) => {
+    const t = (s ?? '').toString().replace(/\s+/g,' ').trim();
+    return t.length > n ? (t.slice(0, n-1) + '…') : t;
+  };
+
+  answers.forEach(a => {
+    const q = (a.text ?? '').toString();
+    const sel = (a.selectedAnswer ?? '—').toString().toUpperCase();
+    const cor = (a.correctAnswer ?? '—').toString().toUpperCase();
+    const ok  = !!a.isCorrect;
+
+    answersSheet.push([
+      a.number,
+      a.section,
+      shorten(q),
+      sel,
+      cor,
+      ok ? 'Да' : 'Нет'
+    ]);
+
+    if (!ok) {
+      errorsSheet.push([
+        a.number,
+        a.section,
+        q,
+        sel,
+        cor,
+        (a.explanation ?? '').toString()
+      ]);
+    }
+  });
+
+  const wb = XLSX.utils.book_new();
+
+  const ws1 = XLSX.utils.aoa_to_sheet(summary);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Сводка');
+
+  const ws2 = XLSX.utils.aoa_to_sheet(answersSheet);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Ответы');
+
+  // Лист "Ошибки" добавляем только если есть неверные ответы (иначе не засоряем файл)
+  if (errorsSheet.length > 1) {
+    const ws3 = XLSX.utils.aoa_to_sheet(errorsSheet);
+    XLSX.utils.book_append_sheet(wb, ws3, 'Ошибки');
+  }
+
+  const fileName = `Отчет_${safeFile(r.userName||'user')}_${r.testDate||'date'}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+},
+    
+
+exportWord(id) {
+  const r = this.getById(id);
+  if (!r) return;
+
+  const answers = (r.details && Array.isArray(r.details.answersDetailed)) ? r.details.answersDetailed : [];
+
+  const esc = (s) => escapeHtml((s ?? '').toString());
+
+  // Формируем Word-совместимый HTML (сохранение в .doc)
+  const css = `
+    body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f5f7fa;color:#222}
+    .head{background:linear-gradient(135deg,#1a3a8f 0%,#2d5cc2 100%);color:#fff;padding:26px 22px}
+    .head h1{margin:0 0 8px 0;font-size:22pt;font-weight:800}
+    .head .sub{opacity:.95;font-size:11pt}
+    .wrap{padding:22px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .card{background:#fff;border:2px solid #eef2ff;border-radius:14px;padding:14px}
+    .label{color:#666;font-size:10pt;margin-bottom:4px}
+    .value{font-weight:800;font-size:12pt}
+    .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+    .kpi .card{text-align:center}
+    .kpi .big{font-size:18pt;font-weight:900}
+    .hr{height:2px;background:#eef2ff;border:0;margin:16px 0}
+    .q{background:#fff;border:2px solid #e6e9f0;border-radius:14px;padding:14px;margin-bottom:12px}
+    .qtitle{font-weight:900;color:#1a3a8f;font-size:12pt;margin-bottom:6px}
+    .meta{color:#555;font-size:10pt;margin-bottom:8px}
+    .opt{border:1px solid #e6e9f0;border-radius:12px;padding:10px;margin:6px 0}
+    .opt.correct{background:#e7f7ef;border-color:#27ae60}
+    .opt.selected{outline:2px solid rgba(45,92,194,.35)}
+    .opt.wrong{background:#fdecea;border-color:#e74c3c}
+    .badge-ok{color:#27ae60;font-weight:900}
+    .badge-bad{color:#e74c3c;font-weight:900}
+    .expl{background:#f8f9ff;border:1px solid #e6e9f0;border-radius:14px;padding:12px;margin-top:10px}
+    @page { margin: 20mm; }
+  `;
+
+  const head = `
+    <div class="head">
+      <h1>ПАО «РОССЕТИ ЮГ» — Отчёт по тестированию</h1>
+      <div class="sub">${esc(r.testTitle || '')} • ${esc(r.testDate || '')} ${esc(r.testTime || '')}</div>
+    </div>
+  `;
+
+  const info = `
+    <div class="wrap">
+      <div class="grid">
+        <div class="card"><div class="label">ФИО</div><div class="value">${esc(r.userName||'')}</div></div>
+        <div class="card"><div class="label">Подразделение</div><div class="value">${esc(r.userDepartment||'')}</div></div>
+        <div class="card"><div class="label">Должность</div><div class="value">${esc(r.userPosition||'')}</div></div>
+        <div class="card"><div class="label">Статус</div><div class="value">${esc(r.status||'')}</div></div>
+      </div>
+
+      <div class="kpi">
+        <div class="card"><div class="big" style="color:#2d5cc2">${Number(r.score||0)}%</div><div class="label">Результат</div></div>
+        <div class="card"><div class="big" style="color:#27ae60">${Number(r.correctAnswers||0)}/${Number(r.totalQuestions||0)}</div><div class="label">Верно</div></div>
+        <div class="card"><div class="big" style="color:#ff9800">${esc(r.testDuration||'')}</div><div class="label">Длительность</div></div>
+        <div class="card"><div class="big" style="color:#17a2b8">${esc(r.testDate||'')}</div><div class="label">Дата</div></div>
+      </div>
+
+      <hr class="hr"/>
+      <h2 style="margin:0 0 10px 0;color:#1a3a8f;font-size:14pt">Ответы</h2>
+  `;
+
+  const qhtml = (answers.length ? answers : []).map(a => {
+    const sel = (a.selectedAnswer || '').toString().toUpperCase();
+    const cor = (a.correctAnswer || '').toString().toUpperCase();
+    const ok  = !!a.isCorrect;
+
+    const opts = Array.isArray(a.options) ? a.options : [];
+    const optsHtml = opts.map(o => {
+      const letter = (o.letter || '').toString().toUpperCase();
+      const text = (o.text ?? '').toString();
+      const classes = [
+        'opt',
+        (letter === cor ? 'correct' : ''),
+        (letter === sel ? 'selected' : ''),
+        (letter === sel && sel && cor && sel !== cor ? 'wrong' : '')
+      ].filter(Boolean).join(' ');
+      return `<div class="${classes}"><strong>${esc(letter)}.</strong> ${esc(text)}</div>`;
+    }).join('');
+
+    const expl = (a.explanation || '').toString().trim();
+    return `
+      <div class="q">
+        <div class="qtitle">Вопрос ${Number(a.number)||''}: ${esc(a.text||'')}</div>
+        <div class="meta">Раздел: <strong>${esc(a.section||'')}</strong> • Ваш ответ: <strong>${esc(sel||'—')}</strong> • Правильный: <strong>${esc(cor||'—')}</strong> • ${ok ? '<span class="badge-ok">Верно</span>' : '<span class="badge-bad">Неверно</span>'}</div>
+        ${optsHtml}
+        ${expl ? `<div class="expl"><strong>Пояснение:</strong> ${esc(expl)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const foot = `</div>`;
+
+  const html = `
+    <html><head><meta charset="utf-8"><style>${css}</style></head>
+    <body>${head}${info}${answers.length ? qhtml : '<div class="card" style="margin-top:10px">Нет детальных ответов для этого отчёта.</div>'}${foot}</body></html>
+  `;
+
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Отчет_${safeFile(r.userName||'user')}_${r.testDate||'date'}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+},
+exportAll() {
+  if (!this.reports.length) { alert('Нет данных для экспорта'); return; }
+
+  // Компактная выгрузка для всех отчётов
+  const data = [[
+    'ФИО','Подразделение','Должность','Тест','Дата','Время','Балл (%)','Верно/Всего','Длительность','Статус'
+  ]];
+
+  this.reports.forEach(r => {
+    data.push([
+      r.userName,
+      r.userDepartment,
+      r.userPosition,
+      r.testTitle,
+      r.testDate,
+      r.testTime,
+      Number(r.score || 0),
+      `${Number(r.correctAnswers||0)}/${Number(r.totalQuestions||0)}`,
+      r.testDuration,
+      r.status
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Отчеты');
+
+  XLSX.writeFile(wb, `Отчеты_${new Date().toISOString().slice(0,10)}.xlsx`);
+},
+    deleteOne(id) {
+      if (!confirm('Удалить этот отчёт?')) return;
+      this.reports = this.reports.filter(r => String(r.id) !== String(id));
+      this.save();
+      // удаляем на сервере
+      try {
+        const pass = sessionStorage.getItem('adminPass') || '';
+        fetch('/api/results/' + encodeURIComponent(id), { method: 'DELETE', headers: { 'X-Admin-Password': pass } }).catch(()=>{});
+      } catch(e) {}
+      this.filtered = [...this.reports];
+      this.updateFilterOptions();
+      this.renderAll();
+    },
+    deleteAll() {
+      if (!this.reports.length) { alert('Нет отчетов для удаления'); return; }
+      if (!confirm('Удалить ВСЕ отчёты? Это действие нельзя отменить.')) return;
+      this.reports = [];
+      this.save();
+      // удаляем на сервере
+      try {
+        const pass = sessionStorage.getItem('adminPass') || '';
+        fetch('/api/results', { method: 'DELETE', headers: { 'X-Admin-Password': pass } }).catch(()=>{});
+      } catch(e) {}
+      this.filtered = [];
+      this.updateFilterOptions();
+      this.renderAll();
+    }
+  };
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s).replace(/"/g,'&quot;'); }
+  function safeFile(s) { return String(s||'').replace(/[^a-zA-Z0-9а-яА-Я_-]+/g,'_').slice(0,80) || 'report'; }
+
+  // Boot
+  if (isAuthed()) {
+    showApp();
+    Admin.init();
+  } else {
+    showAuth();
+  }
+})();
+</script>
+
+</body>
+</html>
